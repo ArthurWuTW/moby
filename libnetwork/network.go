@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/docker/docker/libnetwork/datastore"
 	"github.com/docker/docker/libnetwork/driverapi"
+	"github.com/docker/docker/libnetwork/drivers/bridge"
 	"github.com/docker/docker/libnetwork/etchosts"
 	"github.com/docker/docker/libnetwork/internal/setmatrix"
 	"github.com/docker/docker/libnetwork/ipamapi"
@@ -1615,10 +1617,15 @@ func (n *Network) ipamAllocateVersion(ipVer int, ipam ipamapi.Ipam) error {
 			}
 		}
 
+		disableGatewayAllocate, err := n.DisableGatewayAllocate()
+		if err != nil {
+			return types.InvalidParameterErrorf("failed to parse disable gateway allocate : %v", err)
+		}
+
 		// If user requested a specific gateway, libnetwork will allocate it
 		// irrespective of whether ipam driver returned a gateway already.
 		// If none of the above is true, libnetwork will allocate one.
-		if cfg.Gateway != "" || d.Gateway == nil {
+		if disableGatewayAllocate && (cfg.Gateway != "" || d.Gateway == nil) {
 			gatewayOpts := map[string]string{
 				ipamapi.RequestAddressType: netlabel.Gateway,
 			}
@@ -1887,6 +1894,23 @@ func (n *Network) ConfigOnly() bool {
 	defer n.mu.Unlock()
 
 	return n.configOnly
+}
+
+func (n *Network) DisableGatewayAllocate() (bool, error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if m, ok := n.generic[netlabel.GenericData]; ok {
+		if d, ok := m.(map[string]string)[bridge.DisableGatewayAllocate]; ok {
+			disableGateway, err := strconv.ParseBool(d)
+			if err != nil {
+				return false, err
+			}
+			return disableGateway, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (n *Network) Labels() map[string]string {

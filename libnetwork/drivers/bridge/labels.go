@@ -18,4 +18,7 @@ const (
 
 	// DefaultBridge label
 	DefaultBridge = "com.docker.network.bridge.default_bridge"
+
+	// GatewayDisable
+	DisableGatewayAllocate = "com.docker.network.bridge.disable_gateway_allocate"
 )
