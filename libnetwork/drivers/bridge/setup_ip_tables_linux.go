@@ -113,6 +113,10 @@ func (n *bridgeNetwork) setupIP4Tables(config *networkConfiguration, i *bridgeIn
 		return errors.New("Cannot program chains, EnableIPTable is disabled")
 	}
 
+	if i.bridgeIPv4 == nil {
+		return nil
+	}
+
 	maskedAddrv4 := &net.IPNet{
 		IP:   i.bridgeIPv4.IP.Mask(i.bridgeIPv4.Mask),
 		Mask: i.bridgeIPv4.Mask,
