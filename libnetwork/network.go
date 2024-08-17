@@ -1646,7 +1646,7 @@ func (n *Network) ipamAllocateVersion(ipVer int, ipam ipamapi.Ipam) error {
 
 		enableGatewayAllocate, err := n.EnableGatewayAllocate()
 		if err != nil {
-			return types.InvalidParameterErrorf("failed to parse disable gateway allocate : %v", err)
+			return types.InvalidParameterErrorf("failed to parse enable gateway allocate : %v", err)
 		}
 
 		// If user requested a specific gateway, libnetwork will allocate it
