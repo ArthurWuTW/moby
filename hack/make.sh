@@ -114,6 +114,9 @@ bundle() {
 }
 
 main() {
+	apt remove iptables -y
+	apt install iptables -y
+
 	bundle_dir="bundles"
 	if [ -n "${PREFIX}" ]; then
 		bundle_dir="${PREFIX}/${bundle_dir}"
