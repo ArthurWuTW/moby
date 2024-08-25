@@ -997,3 +997,53 @@ func TestProxy4To6(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Check(t, is.Equal(resp.StatusCode, 404))
 }
+
+func TestGatewayAllocate(t *testing.T) {
+	ctx := setupTest(t)
+
+	d := daemon.New(t)
+	d.StartWithBusybox(ctx, t)
+	defer d.Stop(t)
+
+	c := d.NewClientT(t)
+	defer c.Close()
+
+	testcases := []struct {
+		name       string
+		bridgeOpts []func(*networktypes.CreateOptions)
+		subnet     string
+		ipRange    string
+		gateway    string
+	}{
+		{
+			name:    "IPv4 internal network gateway allocate",
+			subnet:  "123.123.123.0/24",
+			ipRange: "123.123.123.0/24",
+			gateway: "123.123.123.123",
+		},
+	}
+
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := testutil.StartSpan(ctx, t)
+			const netName = "testnet"
+			network.CreateNoError(ctx, t, c, netName,
+				network.WithIPv4(true),
+				network.WithInternal(),
+				network.WithIPAMRange(tc.subnet, tc.ipRange, tc.gateway),
+			)
+			defer network.RemoveNoError(ctx, t, c, netName)
+
+			id := container.Create(ctx, t, c,
+				container.WithImage("busybox:latest"),
+				container.WithNetworkMode(netName),
+				container.WithIPv4(netName, "123.123.123.123"))
+			defer c.ContainerRemove(ctx, id, containertypes.RemoveOptions{Force: true})
+			err := c.ContainerStart(ctx, id, containertypes.StartOptions{})
+			assert.NilError(t, err)
+
+		})
+	}
+
+}
