@@ -428,13 +428,14 @@ func TestCreateWithInvalidHealthcheckParams(t *testing.T) {
 	apiClient := testEnv.APIClient()
 
 	testCases := []struct {
-		doc           string
-		interval      time.Duration
-		timeout       time.Duration
-		retries       int
-		startPeriod   time.Duration
-		startInterval time.Duration
-		expectedErr   string
+		doc              string
+		interval         time.Duration
+		timeout          time.Duration
+		retries          int
+		startPeriod      time.Duration
+		startInterval    time.Duration
+		expectedErr      string
+		expectedWarnings []string
 	}{
 		{
 			doc:         "test invalid Interval in Healthcheck: less than 0s",
@@ -481,6 +482,16 @@ func TestCreateWithInvalidHealthcheckParams(t *testing.T) {
 			startInterval: 100 * time.Microsecond,
 			expectedErr:   fmt.Sprintf("StartInterval in Healthcheck cannot be less than %s", container.MinimumDuration),
 		},
+		{
+			doc:           "test StartInterval is valid only if nonzero StartPeriod is set in HealthCheck",
+			interval:      time.Second,
+			timeout:       time.Second,
+			retries:       1000,
+			startInterval: time.Second,
+			expectedWarnings: []string{
+				"StartInterval is valid only if nonzero StartPeriod is set in HealthCheck",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -494,16 +505,22 @@ func TestCreateWithInvalidHealthcheckParams(t *testing.T) {
 					Timeout:       tc.timeout,
 					Retries:       tc.retries,
 					StartInterval: tc.startInterval,
+					StartPeriod:   tc.startPeriod,
 				},
-			}
-			if tc.startPeriod != 0 {
-				cfg.Healthcheck.StartPeriod = tc.startPeriod
 			}
 
 			resp, err := apiClient.ContainerCreate(ctx, &cfg, &container.HostConfig{}, nil, nil, "")
-			assert.Check(t, is.Equal(len(resp.Warnings), 0))
-			assert.Check(t, is.ErrorType(err, errdefs.IsInvalidParameter))
-			assert.ErrorContains(t, err, tc.expectedErr)
+			for _, w := range tc.expectedWarnings {
+				assert.Assert(t, is.Contains(resp.Warnings, w))
+			}
+
+			if tc.expectedErr != "" {
+				assert.Check(t, is.ErrorType(err, errdefs.IsInvalidParameter))
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				assert.NilError(t, err)
+			}
+
 		})
 	}
 }

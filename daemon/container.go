@@ -228,11 +228,13 @@ func (daemon *Daemon) setHostConfig(container *container.Container, hostConfig *
 // structures.
 func (daemon *Daemon) verifyContainerSettings(daemonCfg *configStore, hostConfig *containertypes.HostConfig, config *containertypes.Config, update bool) (warnings []string, _ error) {
 	// First perform verification of settings common across all platforms.
-	if err := validateContainerConfig(config); err != nil {
+	warns, err := validateContainerConfig(config)
+	warnings = append(warnings, warns...)
+	if err != nil {
 		return nil, err
 	}
 
-	warns, err := validateHostConfig(hostConfig)
+	warns, err = validateHostConfig(hostConfig)
 	warnings = append(warnings, warns...)
 	if err != nil {
 		return warnings, err
@@ -245,22 +247,22 @@ func (daemon *Daemon) verifyContainerSettings(daemonCfg *configStore, hostConfig
 	return warnings, err
 }
 
-func validateContainerConfig(config *containertypes.Config) error {
+func validateContainerConfig(config *containertypes.Config) (warnings []string, _ error) {
 	if config == nil {
-		return nil
+		return nil, nil
 	}
 	if err := translateWorkingDir(config); err != nil {
-		return err
+		return warnings, err
 	}
 	if len(config.StopSignal) > 0 {
 		if _, err := signal.ParseSignal(config.StopSignal); err != nil {
-			return err
+			return warnings, err
 		}
 	}
 	// Validate if Env contains empty variable or not (e.g., ``, `=foo`)
 	for _, env := range config.Env {
 		if _, err := opts.ValidateEnv(env); err != nil {
-			return err
+			return warnings, err
 		}
 	}
 	return validateHealthCheck(config.Healthcheck)
@@ -324,26 +326,29 @@ func validateCapabilities(hostConfig *containertypes.HostConfig) error {
 }
 
 // validateHealthCheck validates the healthcheck params of Config
-func validateHealthCheck(healthConfig *containertypes.HealthConfig) error {
+func validateHealthCheck(healthConfig *containertypes.HealthConfig) (warnings []string, _ error) {
 	if healthConfig == nil {
-		return nil
+		return nil, nil
 	}
 	if healthConfig.Interval != 0 && healthConfig.Interval < containertypes.MinimumDuration {
-		return errors.Errorf("Interval in Healthcheck cannot be less than %s", containertypes.MinimumDuration)
+		return warnings, errors.Errorf("Interval in Healthcheck cannot be less than %s", containertypes.MinimumDuration)
 	}
 	if healthConfig.Timeout != 0 && healthConfig.Timeout < containertypes.MinimumDuration {
-		return errors.Errorf("Timeout in Healthcheck cannot be less than %s", containertypes.MinimumDuration)
+		return warnings, errors.Errorf("Timeout in Healthcheck cannot be less than %s", containertypes.MinimumDuration)
 	}
 	if healthConfig.Retries < 0 {
-		return errors.Errorf("Retries in Healthcheck cannot be negative")
+		return warnings, errors.Errorf("Retries in Healthcheck cannot be negative")
 	}
 	if healthConfig.StartPeriod != 0 && healthConfig.StartPeriod < containertypes.MinimumDuration {
-		return errors.Errorf("StartPeriod in Healthcheck cannot be less than %s", containertypes.MinimumDuration)
+		return warnings, errors.Errorf("StartPeriod in Healthcheck cannot be less than %s", containertypes.MinimumDuration)
 	}
 	if healthConfig.StartInterval != 0 && healthConfig.StartInterval < containertypes.MinimumDuration {
-		return errors.Errorf("StartInterval in Healthcheck cannot be less than %s", containertypes.MinimumDuration)
+		return warnings, errors.Errorf("StartInterval in Healthcheck cannot be less than %s", containertypes.MinimumDuration)
 	}
-	return nil
+	if healthConfig.StartInterval != 0 && healthConfig.StartPeriod == 0 {
+		warnings = append(warnings, "StartInterval is valid only if nonzero StartPeriod is set in HealthCheck")
+	}
+	return warnings, nil
 }
 
 func validatePortBindings(ports nat.PortMap) error {
