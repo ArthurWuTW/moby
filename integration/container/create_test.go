@@ -481,6 +481,14 @@ func TestCreateWithInvalidHealthcheckParams(t *testing.T) {
 			startInterval: 100 * time.Microsecond,
 			expectedErr:   fmt.Sprintf("StartInterval in Healthcheck cannot be less than %s", container.MinimumDuration),
 		},
+		{
+			doc:           "test StartInterval requires StartPeriod to be set in Healthcheck",
+			interval:      time.Second,
+			timeout:       time.Second,
+			retries:       1000,
+			startInterval: time.Second,
+			expectedErr:   "StartInterval requires StartPeriod to be set in Healthcheck",
+		},
 	}
 
 	for _, tc := range testCases {
